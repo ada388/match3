@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+  <meta charset="UTF-8">
+  <title>Match-3 Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0f0f1a;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #e94560;
+      margin-bottom: 10px;
+    }
+
+    .score {
+      font-size: 22px;
+      margin-bottom: 20px;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 50px);
+      grid-template-rows: repeat(8, 50px);
+      gap: 4px;
+      background: #1a1a2e;
+      padding: 10px;
+      border-radius: 12px;
+      border: 2px solid #e94560;
+    }
+
+    .tile {
+      width: 50px;
+      height: 50px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .tile:hover {
+      transform: scale(1.08);
+    }
+
+    .tile.selected {
+      outline: 3px solid white;
+      transform: scale(1.1);
+    }
+
+    .controls {
+      margin-top: 20px;
+      color: #aaa;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 25px;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #ff6b81;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Match-3</h1>
+  <div class="score">Pikët: <span id="score">0</span></div>
+  <div id="board"></div>
+  <div class="controls">Kliko dy kuti për t’i ndërruar. Bëj 3 ose më shumë të njëjta!</div>
+  <button onclick="restartGame()">Rifillo</button>
+
+  <script>
+    const board = document.getElementById("board");
+    const scoreEl = document.getElementById("score");
+
+    const colors = ["🔴", "🟢", "🔵", "🟡", "🟣", "🟠"];
+    const size = 8;
+    let tiles = [];
+    let selected = null;
+    let score = 0;
+    let isProcessing = false;
+
+    function createBoard() {
+      board.innerHTML = "";
+      tiles = [];
+
+      for (let row = 0; row < size; row++) {
+        tiles[row] = [];
+        for (let col = 0; col < size; col++) {
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          tile.dataset.row = row;
+          tile.dataset.col = col;
+
+          let color;
+          do {
+            color = colors[Math.floor(Math.random() * colors.length)];
+          } while (
+            (col >= 2 && tiles[row][col-1] === color && tiles[row][col-2] === color) ||
+            (row >= 2 && tiles[row-1][col] === color && tiles[row-2][col] === color)
+          );
+
+          tiles[row][col] = color;
+          tile.textContent = color;
+          tile.style.background = "#16213e";
+          tile.onclick = () => handleClick(row, col, tile);
+
+          board.appendChild(tile);
+        }
+      }
+    }
+
+    function handleClick(row, col, tileEl) {
+      if (isProcessing) return;
+
+      if (!selected) {
+        selected = { row, col, el: tileEl };
+        tileEl.classList.add("selected");
+      } else {
+        const row2 = row;
+        const col2 = col;
+
+        // Kontrollo nëse janë fqinj
+        const isAdjacent =
+          (Math.abs(selected.row - row2) === 1 && selected.col === col2) ||
+          (Math.abs(selected.col - col2) === 1 && selected.row === row2);
+
+        selected.el.classList.remove("selected");
+
+        if (isAdjacent) {
+          swapTiles(selected.row, selected.col, row2, col2);
+        }
+
+        selected = null;
+      }
+    }
+
+    function swapTiles(r1, c1, r2, c2) {
+      // Ndërro
+      const temp = tiles[r1][c1];
+      tiles[r1][c1] = tiles[r2][c2];
+      tiles[r2][c2] = temp;
+
+      updateBoard();
+
+      const matches = findMatches();
+
+      if (matches.length > 0) {
+        processMatches(matches);
+      } else {
+        // Ktheji mbrapsht nëse nuk ka match
+        const temp2 = tiles[r1][c1];
+        tiles[r1][c1] = tiles[r2][c2];
+        tiles[r2][c2] = temp2;
+        updateBoard();
+      }
+    }
+
+    function findMatches() {
+      const matched = [];
+
+      // Horizontal
+      for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size - 2; col++) {
+          const color = tiles[row][col];
+          if (color && color === tiles[row][col+1] && color === tiles[row][col+2]) {
+            matched.push([row, col], [row, col+1], [row, col+2]);
+            // Kontrollo më shumë
+            let extra = col + 3;
+            while (extra < size && tiles[row][extra] === color) {
+              matched.push([row, extra]);
+              extra++;
+            }
+          }
+        }
+      }
+
+      // Vertical
+      for (let col = 0; col < size; col++) {
+        for (let row = 0; row < size - 2; row++) {
+          const color = tiles[row][col];
+          if (color && color === tiles[row+1][col] && color === tiles[row+2][col]) {
+            matched.push([row, col], [row+1, col], [row+2, col]);
+            let extra = row + 3;
+            while (extra < size && tiles[extra][col] === color) {
+              matched.push([extra, col]);
+              extra++;
+            }
+          }
+        }
+      }
+
+      // Hiq dublikatat
+      const unique = [];
+      const seen = new Set();
+      for (let m of matched) {
+        const key = m[0] + "," + m[1];
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(m);
+        }
+      }
+      return unique;
+    }
+
+    function processMatches(matches) {
+      isProcessing = true;
+
+      // Shto pikë
+      score += matches.length * 10;
+      scoreEl.textContent = score;
+
+      // Zhduki
+      for (let [row, col] of matches) {
+        tiles[row][col] = null;
+      }
+      updateBoard();
+
+      setTimeout(() => {
+        dropTiles();
+        setTimeout(() => {
+          const newMatches = findMatches();
+          if (newMatches.length > 0) {
+            processMatches(newMatches);
+          } else {
+            isProcessing = false;
+          }
+        }, 300);
+      }, 300);
+    }
+
+    function dropTiles() {
+      for (let col = 0; col < size; col++) {
+        let empty = size - 1;
+        for (let row = size - 1; row >= 0; row--) {
+          if (tiles[row][col] !== null) {
+            tiles[empty][col] = tiles[row][col];
+            if (empty !== row) tiles[row][col] = null;
+            empty--;
+          }
+        }
+        // Mbush boshllëqet
+        for (let row = empty; row >= 0; row--) {
+          tiles[row][col] = colors[Math.floor(Math.random() * colors.length)];
+        }
+      }
+      updateBoard();
+    }
+
+    function updateBoard() {
+      const allTiles = document.querySelectorAll(".tile");
+      allTiles.forEach(tile => {
+        const row = tile.dataset.row;
+        const col = tile.dataset.col;
+        tile.textContent = tiles[row][col] || "";
+        tile.style.opacity = tiles[row][col] ? "1" : "0.3";
+      });
+    }
+
+    function restartGame() {
+      score = 0;
+      scoreEl.textContent = "0";
+      selected = null;
+      isProcessing = false;
+      createBoard();
+    }
+
+    createBoard();
+  </script>
+
+</body>
+</html>
